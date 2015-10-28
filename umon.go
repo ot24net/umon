@@ -334,7 +334,7 @@ func (b *Runner) runRun() {
 			// exist
 			if _, err := os.Stat(appName); err != nil {
 				if os.IsNotExist(err) {
-					log.Println("[umon]", "Runner: app not exist, run go build first")
+					log.Println("[umon]", "Runner: app not exist, run go build, then restart umon")
 				}
 				continue
 			}
