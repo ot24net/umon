@@ -1,4 +1,17 @@
 # umon
 live reload for golang app
 
-umon watch files in $GOPATH and run go build on change
+## Usage:
+  umon dir1 dir2 dir3 ...
+
+## Example:
+
+```
+#!/bin/bash
+
+cd app
+WEBAPP=$HOME/work/webapp umon ../app ../lib ../model ../ctrl
+
+```
+  
+  

@@ -12,27 +12,6 @@ import (
 )
 
 //
-// Get umon execute folder
-//
-func ExecFolder() (string, error) {
-	p, err := os.Readlink("/proc/self/exe")
-	if err != nil {
-		return "", err
-	}
-	
-	f, _ := filepath.Split(filepath.Clean(p))
-	if len(f) > 1 {
-		for i := len(f)-2; i >= 0; i-- {
-			if f[i] == '/' {
-				return f[i+1:len(f)-1], nil
-			}
-		}
-	}
-	
-	return f, nil
-}
-
-//
 // Event
 //
 type Event struct {
@@ -66,23 +45,28 @@ type Watcher struct {
 }
 
 // NewWatcher create watcher
-func NewWatcher(dir string) (*Watcher, error) {
+func NewWatcher(dirs []string) (*Watcher, error) {
 	// w
 	w, err := fs.NewWatcher()
 	if err != nil {
 		return nil, err
 	}
-	filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if info == nil {
-			return err
-		}
-		if !info.IsDir() {
+	
+	// listen
+	log.Println("Watcher: watch dirs", dirs)
+	for _, dir := range dirs {
+		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+			if info == nil {
+				return err
+			}
+			if !info.IsDir() {
+				return nil
+			}
+			//log.Println(path)
+			w.Add(path)
 			return nil
-		}
-		//log.Println(path)
-		w.Add(path)
-		return nil
-	})
+		})
+	}
 	
 	// ok
 	return &Watcher {
@@ -274,11 +258,11 @@ func (b *Builder) runBuild() {
 				log.Fatal(err)
 			}
 			if err := cmd.Wait(); err != nil {
-				log.Println("build FAIL")
+				log.Println("Builder: build err", err)
 			} else {
 				lastTime = time.Now()
 				lastEvt = e
-				log.Println("buid SUCCESS:", e)
+				log.Println("Builder: build ok")
 			}
 		}
 	}
@@ -320,12 +304,20 @@ func (b *Runner) Pipe(next Piper) Piper {
 
 // runRun run runner
 func (b *Runner) runRun() {
-	var cmd *exec.Cmd
-	appName := "./" + ExecFolder()
+	// app name
+	runDir := os.Getenv("PWD")
+	if len(runDir) == 0 {
+		panic("no PWD env")
+	}		
+	appName := filepath.Join(runDir, filepath.Base(runDir))
+	log.Println("Runner: app", appName)
 	
+	// notify run
 	runC := make(chan bool, 1)
 	runC <- true
 
+	// cmd
+	var cmd *exec.Cmd
 	for {
 		select {
 		case <-b.exit:
@@ -334,32 +326,30 @@ func (b *Runner) runRun() {
 		case <-runC:
 			// kill
 			if cmd != nil {
-				log.Println("kill:", cmd.Process)
+				log.Println("Runner: kill", cmd.Process)
 				if cmd.Process != nil {
 					cmd.Process.Kill()
 				}
 				cmd = nil
 				time.Sleep(time.Second)
-			} else {
-				log.Println("cmd == nil") 
-			}
+			} 
 			
 			// exist
 			if _, err := os.Stat(appName); err != nil {
 				continue
-			}
+			} 
 
 			// start
 			cmd = exec.Command(appName)
 			cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 			if err := cmd.Start(); err != nil {
-				log.Println("Runner err:", err)
+				log.Println("Runner: start err", err)
 			} else {
-				log.Println("Runner success")
+				log.Println("Runner: start ok")
 			}
 			
-		case e := <-b.events:
-			log.Println("Runner:", e)
+		case <-b.events:
+			// log.Println("Runner:", e)
 			runC <- true
 		}
 	}
@@ -393,7 +383,7 @@ func (ed *Ender) Pipe(next Piper) Piper {
 
 // @impl Piper.Handle
 func (ed *Ender) Handle(e *Event) {
-	log.Println("Ender:", e)
+	log.Println("Ender: handle", e)
 }
 
 // @impl Close
@@ -402,11 +392,15 @@ func (ed *Ender) Close() error {
 }
 
 //
-// main
+// umon ../app ../ctrl
 //
 func main() {
 	// watcher
-	watch, err := NewWatcher(".")
+	watchDir := []string{"."}
+	if len(os.Args) > 1 {
+		watchDir = os.Args[1:]
+	}
+	watch, err := NewWatcher(watchDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -443,7 +437,7 @@ func main() {
 	// pipe
 	watch.Pipe(filter).Pipe(builder).Pipe(runner).Pipe(end)
 	
-	// exit
+	// wait
 	exit := make(ChanExit)
 	<-exit
 }
