@@ -98,7 +98,6 @@ func (w *Watcher) runWatch() {
 					w.w.Remove(e.Name)
 				}
 			}
-
 			w.next.Handle(&Event{
 				E: e,
 				T: time.Now(),
@@ -163,17 +162,7 @@ func (f *Filter) runFilt() {
 		select {
 		case <-f.exit:
 			return
-
-		case <-ticker.C:
-			if lastEvt == nil {
-				continue
-			}
-			if time.Now().Sub(lastTime) < time.Second {
-				continue
-			}
-			f.next.Handle(lastEvt)
-			lastEvt = nil
-
+			
 		case e := <-f.events:
 			name := filepath.Base(e.E.Name)
 			if strings.HasPrefix(name, ".") {
@@ -185,6 +174,16 @@ func (f *Filter) runFilt() {
 			}
 			lastTime = time.Now()
 			lastEvt = e
+
+		case <-ticker.C:
+			if lastEvt == nil {
+				continue
+			}
+			if time.Now().Sub(lastTime) < time.Second {
+				continue
+			}
+			f.next.Handle(lastEvt)
+			lastEvt = nil
 		}
 	}
 }
@@ -236,16 +235,6 @@ func (b *Builder) runBuild() {
 		case <-b.exit:
 			return
 
-		case <-ticker.C:
-			if lastEvt == nil {
-				continue
-			}
-			if time.Now().Sub(lastTime) < time.Second {
-				continue
-			}
-			b.next.Handle(lastEvt)
-			lastEvt = nil
-
 		case e := <-b.events:
 			cmd := exec.Command("go", "build")
 			cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
@@ -259,6 +248,16 @@ func (b *Builder) runBuild() {
 				lastEvt = e
 				log.Println("[umon]", "Builder: build ok")
 			}
+			
+		case <-ticker.C:
+			if lastEvt == nil {
+				continue
+			}
+			if time.Now().Sub(lastTime) < time.Second {
+				continue
+			}
+			b.next.Handle(lastEvt)
+			lastEvt = nil
 		}
 	}
 }
@@ -318,6 +317,9 @@ func (b *Runner) runRun() {
 		case <-b.exit:
 			return
 
+		case <-b.events:
+			runC <- true
+			
 		case <-runC:
 			// kill
 			if cmd != nil {
@@ -345,9 +347,6 @@ func (b *Runner) runRun() {
 			} else {
 				log.Println("[umon]", "Runner: start ok")
 			}
-
-		case <-b.events:
-			runC <- true
 		}
 	}
 }
