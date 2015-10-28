@@ -1,5 +1,5 @@
 # About
-Yet another live reload app for golang, it watch xxx.go files only.
+Yet another live reload app for golang, it watchs xxx.go files only.
 
 # Install
 ```
@@ -22,6 +22,7 @@ umon dir1 dir2 dir3 ...
 cd app
 
 # WEBAPP is environment var for app
+# ../app, ../lib, ../model, ../ctrl contains .go files that need build
 WEBAPP=$HOME/work/webapp umon ../app ../lib ../model ../ctrl
 ```
   
