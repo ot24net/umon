@@ -3,11 +3,11 @@ package main
 import (
 	"log"
 	"os"
-	"time"
-	"strings"
 	"os/exec"
 	"path/filepath"
-	
+	"strings"
+	"time"
+
 	fs "gopkg.in/fsnotify.v1"
 )
 
@@ -35,11 +35,11 @@ type Piper interface {
 	Close() error
 }
 
-// 
+//
 // Watcher watch file changes
 //
 type Watcher struct {
-	w *fs.Watcher
+	w    *fs.Watcher
 	next Piper
 	exit ChanExit
 }
@@ -51,9 +51,9 @@ func NewWatcher(dirs []string) (*Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	
+
 	// listen
-	log.Println("Watcher: watch dirs", dirs)
+	log.Println("[umon]", "Watcher: watch dirs", dirs)
 	for _, dir := range dirs {
 		filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 			if info == nil {
@@ -62,15 +62,14 @@ func NewWatcher(dirs []string) (*Watcher, error) {
 			if !info.IsDir() {
 				return nil
 			}
-			//log.Println(path)
 			w.Add(path)
 			return nil
 		})
 	}
-	
+
 	// ok
-	return &Watcher {
-		w: w,
+	return &Watcher{
+		w:    w,
 		exit: make(ChanExit, 1),
 	}, nil
 }
@@ -88,9 +87,8 @@ func (w *Watcher) runWatch() {
 		select {
 		case <-w.exit:
 			return
-			
+
 		case e := <-w.w.Events:
-			//log.Println("Watcher:", e.String())
 			info, _ := os.Stat(e.Name)
 			if info != nil && info.IsDir() {
 				switch e.Op {
@@ -100,9 +98,9 @@ func (w *Watcher) runWatch() {
 					w.w.Remove(e.Name)
 				}
 			}
-			
+
 			w.next.Handle(&Event{
-				E: e, 
+				E: e,
 				T: time.Now(),
 				I: info,
 			})
@@ -126,14 +124,14 @@ func (w *Watcher) Close() error {
 //
 type Filter struct {
 	next Piper
-	
+
 	events ChanEvent
-	exit ChanExit
+	exit   ChanExit
 }
 
 func NewFilter() (*Filter, error) {
 	return &Filter{
-		exit: make(ChanExit, 1),
+		exit:   make(ChanExit, 1),
 		events: make(ChanEvent, 16),
 	}, nil
 }
@@ -155,17 +153,17 @@ func (f *Filter) runFilt() {
 	// last time when receive event
 	var (
 		lastTime time.Time
-		lastEvt *Event
+		lastEvt  *Event
 	)
-	
+
 	// check event ticker
-	ticker := time.NewTicker(1*time.Second)
-	
+	ticker := time.NewTicker(1 * time.Second)
+
 	for {
 		select {
 		case <-f.exit:
 			return
-			
+
 		case <-ticker.C:
 			if lastEvt == nil {
 				continue
@@ -173,12 +171,10 @@ func (f *Filter) runFilt() {
 			if time.Now().Sub(lastTime) < time.Second {
 				continue
 			}
-			// log.Println("Filter pass:", filepath.Base(lastEvt.E.Name))
 			f.next.Handle(lastEvt)
 			lastEvt = nil
-			
+
 		case e := <-f.events:
-			//log.Println("Filter:", e)
 			name := filepath.Base(e.E.Name)
 			if strings.HasPrefix(name, ".") {
 				continue
@@ -186,8 +182,8 @@ func (f *Filter) runFilt() {
 			ext := filepath.Ext(name)
 			if ext != ".go" {
 				continue
-			} 
-			lastTime = time.Now()			
+			}
+			lastTime = time.Now()
 			lastEvt = e
 		}
 	}
@@ -203,14 +199,14 @@ func (f *Filter) Close() error {
 // Builder builder unwanted event
 //
 type Builder struct {
-	next Piper
+	next   Piper
 	events ChanEvent
-	exit ChanExit
+	exit   ChanExit
 }
 
 func NewBuilder() (*Builder, error) {
 	return &Builder{
-		exit: make(ChanExit, 1),
+		exit:   make(ChanExit, 1),
 		events: make(ChanEvent, 16),
 	}, nil
 }
@@ -231,15 +227,15 @@ func (b *Builder) Pipe(next Piper) Piper {
 func (b *Builder) runBuild() {
 	var (
 		lastTime time.Time
-		lastEvt *Event
+		lastEvt  *Event
 	)
-	ticker := time.NewTicker(1*time.Second)
-	
+	ticker := time.NewTicker(1 * time.Second)
+
 	for {
 		select {
 		case <-b.exit:
 			return
-			
+
 		case <-ticker.C:
 			if lastEvt == nil {
 				continue
@@ -249,20 +245,19 @@ func (b *Builder) runBuild() {
 			}
 			b.next.Handle(lastEvt)
 			lastEvt = nil
-			
+
 		case e := <-b.events:
-			// log.Println("Builder:", e)
 			cmd := exec.Command("go", "build")
 			cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 			if err := cmd.Start(); err != nil {
 				log.Fatal(err)
 			}
 			if err := cmd.Wait(); err != nil {
-				log.Println("Builder: build err", err)
+				log.Println("[umon]", "Builder: build err", err)
 			} else {
 				lastTime = time.Now()
 				lastEvt = e
-				log.Println("Builder: build ok")
+				log.Println("[umon]", "Builder: build ok")
 			}
 		}
 	}
@@ -278,14 +273,14 @@ func (b *Builder) Close() error {
 // Runner runner unwanted event
 //
 type Runner struct {
-	next Piper
+	next   Piper
 	events ChanEvent
-	exit ChanExit
+	exit   ChanExit
 }
 
 func NewRunner() (*Runner, error) {
 	return &Runner{
-		exit: make(ChanExit, 1),
+		exit:   make(ChanExit, 1),
 		events: make(ChanEvent, 16),
 	}, nil
 }
@@ -308,10 +303,10 @@ func (b *Runner) runRun() {
 	runDir := os.Getenv("PWD")
 	if len(runDir) == 0 {
 		panic("no PWD env")
-	}		
+	}
 	appName := filepath.Join(runDir, filepath.Base(runDir))
-	log.Println("Runner: app", appName)
-	
+	log.Println("[umon]", "Runner: app", appName)
+
 	// notify run
 	runC := make(chan bool, 1)
 	runC <- true
@@ -322,34 +317,33 @@ func (b *Runner) runRun() {
 		select {
 		case <-b.exit:
 			return
-			
+
 		case <-runC:
 			// kill
 			if cmd != nil {
-				log.Println("Runner: kill", cmd.Process)
+				log.Println("[umon]", "Runner: kill", cmd.Process)
 				if cmd.Process != nil {
 					cmd.Process.Kill()
 				}
 				cmd = nil
 				time.Sleep(time.Second)
-			} 
-			
+			}
+
 			// exist
 			if _, err := os.Stat(appName); err != nil {
 				continue
-			} 
+			}
 
 			// start
 			cmd = exec.Command(appName)
 			cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 			if err := cmd.Start(); err != nil {
-				log.Println("Runner: start err", err)
+				log.Println("[umon]", "Runner: start err", err)
 			} else {
-				log.Println("Runner: start ok")
+				log.Println("[umon]", "Runner: start ok")
 			}
-			
+
 		case <-b.events:
-			// log.Println("Runner:", e)
 			runC <- true
 		}
 	}
@@ -371,7 +365,7 @@ type Ender struct {
 // NewEnder create ender instance
 func NewEnder() (*Ender, error) {
 	return &Ender{
-		// empty
+	// empty
 	}, nil
 }
 
@@ -383,7 +377,7 @@ func (ed *Ender) Pipe(next Piper) Piper {
 
 // @impl Piper.Handle
 func (ed *Ender) Handle(e *Event) {
-	log.Println("Ender: handle", e)
+	log.Println("[umon]", "Ender: handle", e)
 }
 
 // @impl Close
@@ -405,38 +399,38 @@ func main() {
 		log.Fatal(err)
 	}
 	defer watch.Close()
-	
+
 	// filter
 	filter, err := NewFilter()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer filter.Close()
-	
+
 	// builder
 	builder, err := NewBuilder()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer builder.Close()
-	
+
 	// runner
 	runner, err := NewRunner()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer runner.Close()
-	
+
 	// end
 	end, err := NewEnder()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer end.Close()
-	
+
 	// pipe
 	watch.Pipe(filter).Pipe(builder).Pipe(runner).Pipe(end)
-	
+
 	// wait
 	exit := make(ChanExit)
 	<-exit
