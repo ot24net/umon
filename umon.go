@@ -157,7 +157,7 @@ func (f *Filter) runFilt() {
 	)
 
 	// check event ticker
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(time.Second)
 
 	for {
 		select {
@@ -229,7 +229,7 @@ func (b *Builder) runBuild() {
 		lastTime time.Time
 		lastEvt  *Event
 	)
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(time.Second)
 
 	for {
 		select {
@@ -326,7 +326,7 @@ func (b *Runner) runRun() {
 					cmd.Process.Kill()
 				}
 				cmd = nil
-				time.Sleep(time.Second)
+				time.Sleep(200*time.Microsecond)
 			}
 
 			// exist
