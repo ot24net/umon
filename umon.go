@@ -224,18 +224,13 @@ func (b *Builder) Pipe(next Piper) Piper {
 
 // runBuild run builder
 func (b *Builder) runBuild() {
-	var (
-		lastTime time.Time
-		lastEvt  *Event
-	)
-	ticker := time.NewTicker(time.Second)
-
 	for {
 		select {
 		case <-b.exit:
 			return
 
 		case e := <-b.events:
+			log.Println("[umon]", "Builder: go build")
 			cmd := exec.Command("go", "build")
 			cmd.Stderr, cmd.Stdout = os.Stderr, os.Stdout
 			if err := cmd.Start(); err != nil {
@@ -244,20 +239,9 @@ func (b *Builder) runBuild() {
 			if err := cmd.Wait(); err != nil {
 				log.Println("[umon]", "Builder: build err", err)
 			} else {
-				lastTime = time.Now()
-				lastEvt = e
 				log.Println("[umon]", "Builder: build ok")
+				b.next.Handle(e)
 			}
-			
-		case <-ticker.C:
-			if lastEvt == nil {
-				continue
-			}
-			if time.Now().Sub(lastTime) < time.Second {
-				continue
-			}
-			b.next.Handle(lastEvt)
-			lastEvt = nil
 		}
 	}
 }
@@ -334,7 +318,7 @@ func (b *Runner) runRun() {
 			// exist
 			if _, err := os.Stat(appName); err != nil {
 				if os.IsNotExist(err) {
-					log.Println("[umon]", "Runner: app not exist, run go build, then restart umon")
+					log.Println("[umon]", "Runner: app not exist, run go build and restart umon, or just modify source code")
 				}
 				continue
 			}
