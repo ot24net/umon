@@ -20,6 +20,8 @@ type Event struct {
 	I os.FileInfo
 }
 
+var EMPTY_EVENT Event
+
 //
 // chans
 //
@@ -292,7 +294,6 @@ func (b *Runner) runRun() {
 
 	// notify run
 	runC := make(chan bool, 1)
-	runC <- true
 
 	// cmd
 	var cmd *exec.Cmd
@@ -318,7 +319,7 @@ func (b *Runner) runRun() {
 			// exist
 			if _, err := os.Stat(appName); err != nil {
 				if os.IsNotExist(err) {
-					log.Println("[umon]", "Runner: app not exist, run go build and restart umon, or just modify source code")
+					log.Println("[umon]", "Runner: app not exist, wait first go build")
 				}
 				continue
 			}
@@ -416,6 +417,8 @@ func main() {
 
 	// pipe
 	watch.Pipe(filter).Pipe(builder).Pipe(runner).Pipe(end)
+	// build on enter with empty event
+	builder.Handle(&EMPTY_EVENT)
 
 	// wait
 	exit := make(ChanExit)
