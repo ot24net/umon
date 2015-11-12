@@ -167,7 +167,7 @@ func (f *Filter) runFilt() {
 			
 		case e := <-f.events:
 			name := filepath.Base(e.E.Name)
-			if strings.HasPrefix(name, ".") {
+			if strings.HasPrefix(name, ".") || strings.HasPrefix(name, "~") {
 				continue
 			}
 			ext := filepath.Ext(name)
